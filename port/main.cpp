@@ -23,6 +23,7 @@
 // 사용자 정의 헤더 임포트
 #include "port.hpp"
 #include "upnp.hpp"
+#include "ip.hpp"
 
 using namespace std;
 namespace init {
@@ -248,13 +249,25 @@ int main() {
 			);
 			continue;
 		}
-		if (receivedString == "open upnp port") {
-			const unsigned short randomPort = pick_random_port();
-			const string IP = upnp::get_local_ip();
-			cout << "IP: " << IP << " port: " << randomPort << endl;
-			cout << upnp::map_port_upnp(randomPort, IP) << endl;
-		}
+		//if (receivedString == "open upnp port") {
+		//	
+		//}
 		
+		if (receivedString == "get public ip") {
+			PublicAddr IP = ip::get_public_ip_udp();
+			cout << IP.ip << endl;
+			const string reply = IP.ip;
+			sendto(
+				udpListenSock,
+				reply.c_str(),
+				static_cast<int>(reply.length()),
+				0,
+				reinterpret_cast<const struct sockaddr*>(&from),
+				fromLen
+			);
+			continue;
+		}
+
 		const string reply = "Hello from UDP server\n";
 		sendto(
 			udpListenSock,
