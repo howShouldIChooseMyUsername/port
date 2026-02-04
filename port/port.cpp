@@ -211,6 +211,7 @@ namespace port {
 				futures.clear();
 			}
 		}
+		std::cout << "포트 스캐닝 끝" << std::endl;
 		return portList;
 	}
 

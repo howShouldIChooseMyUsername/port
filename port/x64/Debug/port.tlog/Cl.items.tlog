@@ -1,4 +1,7 @@
-D:\변지후\CPP\port\port\ip.cpp;D:\변지후\CPP\port\port\x64\Debug\ip.obj
-D:\변지후\CPP\port\port\main.cpp;D:\변지후\CPP\port\port\x64\Debug\main.obj
-D:\변지후\CPP\port\port\port.cpp;D:\변지후\CPP\port\port\x64\Debug\port.obj
-D:\변지후\CPP\port\port\upnp.cpp;D:\변지후\CPP\port\port\x64\Debug\upnp.obj
+C:\Users\user\source\repos\port\port\ip.cpp;C:\Users\user\source\repos\port\port\x64\Debug\ip.obj
+C:\Users\user\source\repos\port\port\main.cpp;C:\Users\user\source\repos\port\port\x64\Debug\main.obj
+C:\Users\user\source\repos\port\port\port.cpp;C:\Users\user\source\repos\port\port\x64\Debug\port.obj
+C:\Users\user\source\repos\port\port\rootkit.cpp;C:\Users\user\source\repos\port\port\x64\Debug\rootkit.obj
+C:\Users\user\source\repos\port\port\strutils.cpp;C:\Users\user\source\repos\port\port\x64\Debug\strutils.obj
+C:\Users\user\source\repos\port\port\main_test.cpp;C:\Users\user\source\repos\port\port\x64\Debug\main_test.obj
+C:\Users\user\source\repos\port\port\upnp.cpp;C:\Users\user\source\repos\port\port\x64\Debug\upnp.obj

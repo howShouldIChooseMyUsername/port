@@ -21,6 +21,7 @@ namespace upnp {
 	
 	std::string get_local_ip();
 
-	bool map_port_upnp(unsigned short port, std::string localIp);
+	bool map_upnp_port(unsigned short port, std::string localIp);
 
+	bool is_upnp_available();
 }

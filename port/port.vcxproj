@@ -105,6 +105,11 @@
       <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <LanguageStandard>stdcpp20</LanguageStandard>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <PrecompiledHeaderFile>
+      </PrecompiledHeaderFile>
+      <ForcedIncludeFiles>
+      </ForcedIncludeFiles>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -130,11 +135,16 @@
     <ClCompile Include="ip.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="port.cpp" />
+    <ClCompile Include="rootkit.cpp" />
+    <ClCompile Include="strutils.cpp" />
+    <ClCompile Include="main_test.cpp" />
     <ClCompile Include="upnp.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ip.hpp" />
     <ClInclude Include="port.hpp" />
+    <ClInclude Include="rootkit.hpp" />
+    <ClInclude Include="strutils.hpp" />
     <ClInclude Include="upnp.hpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
