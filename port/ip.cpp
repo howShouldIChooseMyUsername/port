@@ -90,7 +90,6 @@ namespace ip {
     PublicAddr get_public_ip_udp_with_socket(SOCKET sock) {
         DWORD timeout = 1000;
         setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
-
         struct addrinfo hints, * res;
         ZeroMemory(&hints, sizeof(hints));
         hints.ai_family = AF_INET;
@@ -151,4 +150,37 @@ namespace ip {
         return addr;
     }
     
+    NatType check_nat_type(SOCKET sock) {
+        DWORD timeout = 1000;
+        setsockopt(sock, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<char*>(&timeout), sizeof(timeout));
+
+        struct addrinfo hints, * res;
+        ZeroMemory(&hints, sizeof(hints));
+        hints.ai_family = AF_INET;
+        hints.ai_socktype = SOCK_DGRAM;
+
+        if (getaddrinfo("stun.l.google.com", "19302", &hints, &res) != 0) {
+            std::cout << "failed to fetch getaddrinfo" << std::endl;
+            return NatType::INVALID;
+        }
+
+        StunHeader req;
+        req.type = htons(0x0001);
+        req.length = 0;
+        req.magic = htonl(0x2112A442);
+        for (int i = 0; i < 12; i++) req.tsid[i] = rand() % 256; // 매직넘버는 랜덤으로
+
+        sendto(sock, reinterpret_cast<char*>(&req), sizeof(req), 0, res->ai_addr, static_cast<int>(res->ai_addrlen));
+        freeaddrinfo(res);
+
+        char buf[512];
+        struct sockaddr_in from_addr;
+        int remote_len = sizeof(from_addr);
+        int len = recvfrom(sock, buf, sizeof(buf), 0, reinterpret_cast<sockaddr*>(&from_addr), &remote_len);
+
+        PublicAddr addr = { "0.0.0.0", 0 };
+        if (len > 20) {
+            // 구현 필요 
+        }
+    }
 }
