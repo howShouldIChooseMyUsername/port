@@ -12,4 +12,5 @@ struct PublicAddr {
 
 namespace ip {
 	PublicAddr get_public_ip_udp();
+	PublicAddr get_public_ip_udp_with_socket(SOCKET sock);
 }

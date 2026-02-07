@@ -1,8 +1,12 @@
 
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
+#define NODRAWTEXT      // DrawText()와 DT_* 매크로 제외
+#define NOGDI           // GDI 기능을 제외 (폰트, 비트맵 등 안 쓸 때)
+#define NOKANJI         // 한자 지원 제외
 #include <winsock2.h>
 #include <ws2tcpip.h>
+#include <windows.h>
 #pragma comment(lib, "ws2_32.lib")
 
 #ifndef SIO_UDP_CONNRESET
@@ -13,6 +17,7 @@
 #include <vector>
 #include <future>
 #include "port.hpp"
+#include "ip.hpp"
 
 // 절대 여기에서 WSAStartup(), WSACleanup() 하지않기
 
@@ -270,5 +275,33 @@ namespace port {
 				futures.clear();
 			}
 		}
+	}
+
+	float get_udp_timeout_sec() {
+		float timeout_s = 30.0f; // 초
+		
+		SOCKET test_sock = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+
+		PublicAddr addr = ip::get_public_ip_udp_with_socket(test_sock);
+		unsigned short port = addr.port;
+		if (port == 0) return 0.0f;
+		for (int i = 0; i < 5; i++) {
+			if (timeout_s > 240.0f) return timeout_s;
+			std::cout << i + 1 <<"번 돌았다 s: " << timeout_s << std::endl;
+			float timeout_ms = timeout_s * 1000; // 밀리초
+			Sleep(static_cast<DWORD>(timeout_ms));
+			PublicAddr tempAddr = ip::get_public_ip_udp_with_socket(test_sock);
+			unsigned short tempPort = tempAddr.port;
+
+			if (port == tempPort) {
+				timeout_s *= 2;
+			}
+			else {
+				timeout_s /= 2;
+				if (tempPort != 0) port = tempPort;
+			}
+		}
+		closesocket(test_sock);
+		return timeout_s;
 	}
 }

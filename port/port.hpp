@@ -21,4 +21,6 @@ namespace port {
 	std::vector<unsigned short> scan_target_ports_tcp(std::string ip, const std::vector<unsigned short>& ports);
 	bool check_target_port_fast_udp(std::string ip, unsigned short port, int  timeout_ms);
 	void scan_target_ports_udp(std::string ip, const std::vector<unsigned short>& ports);
+
+	float get_udp_timeout_sec();
 }
