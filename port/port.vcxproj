@@ -142,6 +142,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ip.hpp" />
+    <ClInclude Include="picosha2.h" />
     <ClInclude Include="port.hpp" />
     <ClInclude Include="rootkit.hpp" />
     <ClInclude Include="strutils.hpp" />

