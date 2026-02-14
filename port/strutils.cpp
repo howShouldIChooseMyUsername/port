@@ -2,13 +2,11 @@
 
 #include <iostream>
 
-using namespace std;
-
 namespace strutils {
 
-	vector<string> split_string(const string& str, char identifier) {
-		string temp = "";
-		vector<string> arr;
+	std::vector<std::string> split_string(const std::string& str, char identifier) {
+		std::string temp = "";
+		std::vector<std::string> arr;
 
 		for (char c : str) {
 			if (c == identifier) {
@@ -24,7 +22,7 @@ namespace strutils {
 		return arr;
 	}
 
-	string merge_string(const vector<string>& vec, string padding) {
+	std::string merge_string(const std::vector<string>& vec, std::string padding) {
 		string temp = "";
 		for (string s : vec) {
 			temp += s;

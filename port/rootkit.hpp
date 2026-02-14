@@ -25,6 +25,11 @@ enum class PathStatus {
 	Error
 };
 
+struct BatchFileResult {
+	bool isSuccessToRun = false;
+	std::string result;
+};
+
 
 namespace rootkit {
 
@@ -41,4 +46,8 @@ namespace rootkit {
 
 	bool is_directory_exists(std::string& path);
 	PathStatus make_run_bat(std::string& ip, unsigned short port);
+
+	bool is_file_exists(std::string& path);
+	BatchFileResult start_run_bat();
+	std::string run_batch_with_output(const std::string& batchFilePath);
 }

